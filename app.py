@@ -14,7 +14,7 @@ def get_db_connection():
     """Establishes a connection to the PostgreSQL database."""
     try:
         conn = psycopg2.connect(
-            dbname=os.getenv("DB_NAME"),
+            dbname=os.getenv("DB_DATABASE"),
             user=os.getenv("DB_USER"),
             password=os.getenv("DB_PASSWORD"),
             host=os.getenv("DB_HOST", "127.0.0.1"),
