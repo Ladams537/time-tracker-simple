@@ -1,24 +1,20 @@
 import os
 import psycopg2
 from flask import Flask, render_template_string, request, redirect, url_for
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime
 from dotenv import load_dotenv
-
-print("--- Script starting ---")
 
 # Load environment variables from .env file
 load_dotenv()
-print("--- .env loaded ---")
 
 app = Flask(__name__)
-print("--- Flask app object created ---")
 
 # --- Database Connection ---
 def get_db_connection():
     """Establishes a connection to the PostgreSQL database."""
     try:
         conn = psycopg2.connect(
-            dbname=os.getenv("DB_DATABASE"),
+            dbname=os.getenv("DB_NAME"),
             user=os.getenv("DB_USER"),
             password=os.getenv("DB_PASSWORD"),
             host=os.getenv("DB_HOST", "127.0.0.1"),
@@ -30,13 +26,47 @@ def get_db_connection():
         print(f"Details: {e}")
         return None
 
+# --- NEW: Database Initialization ---
+def initialize_database():
+    """
+    Checks for the required table on startup and creates it if it doesn't exist.
+    This replaces the need for a separate init_db.py script on the server.
+    """
+    conn = get_db_connection()
+    if not conn:
+        print("CRITICAL: Could not connect to database for initialization. Aborting.")
+        return
+        
+    try:
+        cur = conn.cursor()
+        print("Initializing database: Checking for 'time_log' table...")
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS time_log (
+                id SERIAL PRIMARY KEY,
+                entry_date DATE NOT NULL,
+                time_slot TIME NOT NULL,
+                activity TEXT,
+                category TEXT,
+                priority TEXT,
+                notes TEXT,
+                UNIQUE (entry_date, time_slot)
+            );
+        """)
+        conn.commit()
+        cur.close()
+        print("Database initialized successfully. Table 'time_log' is ready.")
+    except Exception as e:
+        print(f"An error occurred during database initialization: {e}")
+    finally:
+        if conn is not None:
+            conn.close()
+
 # --- Main Application Route ---
 @app.route('/')
 def index():
     """
     Main view that displays the time log for a specific day and the dashboard.
     """
-    print("--- Request received for index route ---")
     # Determine the date to show (today or from query parameter)
     date_str = request.args.get('date', date.today().isoformat())
     try:
@@ -79,7 +109,6 @@ def index():
     next_day = (current_date + timedelta(days=1)).isoformat()
     today_day = date.today().isoformat()
 
-    print("--- Rendering template ---")
     return render_template_string(HTML_TEMPLATE,
                                   time_slots=time_slots,
                                   entries=entries,
@@ -94,7 +123,6 @@ def index():
 @app.route('/save_entry', methods=['POST'])
 def save_entry():
     """Saves or updates a time log entry."""
-    print("--- Saving entry ---")
     entry_date = request.form['entry_date']
     time_slot = request.form['time_slot']
     activity = request.form['activity']
@@ -127,8 +155,7 @@ def save_entry():
     return redirect(url_for('index', date=entry_date))
 
 
-# --- HTML Template ---
-# Using a single file approach for simplicity. All HTML/CSS is here.
+# --- HTML Template (No Changes Below) ---
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="en" class="dark">
@@ -238,9 +265,10 @@ HTML_TEMPLATE = """
 </html>
 """
 
-print("--- Checking if script is run directly ---")
+# Call the initialization function when the script starts
+initialize_database()
+
 if __name__ == '__main__':
     # This is here for direct `python app.py` execution
-    print("--- Starting development server ---")
     app.run(debug=True, port=5001)
 
