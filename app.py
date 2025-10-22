@@ -152,7 +152,12 @@ def save_entry():
     cur.close()
     conn.close()
 
-    return redirect(url_for('index', date=entry_date))
+    # Create an anchor ID that matches the one we'll add to the HTML
+    # e.g., "08:00" becomes "slot-08-00"
+    anchor_id = f"slot-{time_slot.replace(':', '-')}"
+
+    # Add the _anchor argument to the redirect
+    return redirect(url_for('index', date=entry_date, _anchor=anchor_id))
 
 
 # --- HTML Template (No Changes Below) ---
@@ -212,7 +217,7 @@ HTML_TEMPLATE = """
                     <div class="space-y-4">
                         {% for slot in time_slots %}
                             {% set entry = entries.get(slot) %}
-                            <div class="bg-gray-900/50 p-4 rounded-lg" x-data="{ open: false }">
+                            <div id="slot-{{ slot.replace(':', '-') }}" class="bg-gray-900/50 p-4 rounded-lg" x-data="{ open: false }">
                                 <div class="flex items-center cursor-pointer" @click="open = !open">
                                     <span class="font-mono text-lg text-cyan-400 w-20">{{ slot }}</span>
                                     <div class="flex-grow ml-4">
